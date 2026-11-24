@@ -61,14 +61,18 @@ app.post("/webhook", (req, res) => {
 
 // 3) Butonlu eğitim anketi gönderen endpoint
 app.post("/anket-gonder", async (req, res) => {
-  if (!ACCESS_TOKEN) {
-    return res.status(500).json({ hata: "WA_TOKEN ortam değişkeni tanımlı değil." });
+  const token = req.body.token || process.env.WA_TOKEN;
+  const phoneNumberId = req.body.phoneNumberId || process.env.PHONE_NUMBER_ID || "1553594594490625";
+  const to = req.body.to;
+
+  if (!token) {
+    return res.status(400).json({ hata: "Token bulunamadı (body.token veya WA_TOKEN gerekli)." });
+  }
+  if (!to) {
+    return res.status(400).json({ hata: "to alanı gerekli (örn: 905011422468)." });
   }
 
-  const to = req.body.to;
-  if (!to) return res.status(400).json({ hata: "to alanı gerekli (örn: 905011422468)" });
-
-  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${PHONE_NUMBER_ID}/messages`;
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}/messages`;
   const payload = {
     messaging_product: "whatsapp",
     to,
@@ -88,17 +92,23 @@ app.post("/anket-gonder", async (req, res) => {
     },
   };
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${ACCESS_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
 
-  const data = await response.json();
-  return res.status(response.ok ? 200 : 400).json(data);
+    const data = await response.json();
+    console.log("META YANITI:", response.status, JSON.stringify(data));
+    return res.status(response.ok ? 200 : 400).json(data);
+  } catch (err) {
+    console.error("İSTEK HATASI:", err);
+    return res.status(500).json({ hata: err.message });
+  }
 });
 
 app.listen(PORT, () => {
